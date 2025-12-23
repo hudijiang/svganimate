@@ -11,8 +11,19 @@ import {
     Pause,
     Maximize2,
     Code,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Film,
+    Settings,
+    X,
+    Check
 } from "lucide-react";
+import {
+    exportToMP4,
+    downloadBlob,
+    RESOLUTION_OPTIONS,
+    FPS_OPTIONS,
+    DURATION_OPTIONS
+} from "@/lib/videoExport";
 
 function CreateContent() {
     const searchParams = useSearchParams();
@@ -22,6 +33,19 @@ function CreateContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPlaying, setIsPlaying] = useState(true);
     const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
+
+    // MP4 导出状态
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportProgress, setExportProgress] = useState(0);
+    const [exportMessage, setExportMessage] = useState("");
+    const [exportError, setExportError] = useState<string | null>(null);
+
+    // 导出设置
+    const [selectedResolution, setSelectedResolution] = useState(RESOLUTION_OPTIONS[0]);
+    const [selectedFps, setSelectedFps] = useState(FPS_OPTIONS[1]); // 30 FPS
+    const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[1]); // 5 秒
+    const [selectedQuality, setSelectedQuality] = useState<"high" | "medium" | "low">("high");
 
     // 示例生成的 SVG
     const [generatedSvg, setGeneratedSvg] = useState(`
@@ -85,7 +109,7 @@ function CreateContent() {
         navigator.clipboard.writeText(generatedSvg);
     };
 
-    const handleDownload = () => {
+    const handleDownloadSvg = () => {
         const blob = new Blob([generatedSvg], { type: "image/svg+xml" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -93,6 +117,44 @@ function CreateContent() {
         a.download = "animation.svg";
         a.click();
         URL.revokeObjectURL(url);
+    };
+
+    const handleExportMP4 = async () => {
+        setIsExporting(true);
+        setExportError(null);
+        setExportProgress(0);
+        setExportMessage("初始化...");
+
+        try {
+            const blob = await exportToMP4(
+                generatedSvg,
+                {
+                    width: selectedResolution.width,
+                    height: selectedResolution.height,
+                    fps: selectedFps.value,
+                    duration: selectedDuration.value,
+                    quality: selectedQuality,
+                },
+                (progress, message) => {
+                    setExportProgress(progress);
+                    setExportMessage(message);
+                }
+            );
+
+            // 下载文件
+            const resolution = selectedResolution.label.split(" ")[0];
+            downloadBlob(blob, `animation_${resolution}_${selectedFps.value}fps.mp4`);
+
+            // 短暂显示完成状态
+            setExportMessage("导出完成！");
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            setShowExportModal(false);
+        } catch (error) {
+            console.error("导出失败:", error);
+            setExportError(error instanceof Error ? error.message : "导出过程中发生错误");
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     return (
@@ -225,12 +287,22 @@ function CreateContent() {
                             <h2 className="text-lg font-semibold text-white mb-4">导出选项</h2>
 
                             <div className="space-y-3">
+                                {/* 下载 SVG */}
                                 <button
-                                    onClick={handleDownload}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-orange-500 text-white font-medium hover:bg-orange-400 transition-colors"
+                                    onClick={handleDownloadSvg}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-stone-700 text-white font-medium hover:bg-stone-600 transition-colors"
                                 >
                                     <Download className="w-4 h-4" />
                                     下载 SVG
+                                </button>
+
+                                {/* 导出 MP4 */}
+                                <button
+                                    onClick={() => setShowExportModal(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-pink-500 text-white font-medium hover:from-orange-400 hover:to-pink-400 transition-all"
+                                >
+                                    <Film className="w-4 h-4" />
+                                    导出 4K MP4
                                 </button>
 
                                 <button
@@ -265,6 +337,174 @@ function CreateContent() {
 
                 </div>
             </div>
+
+            {/* MP4 导出模态框 */}
+            {showExportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+                    <div className="glass-card rounded-2xl w-full max-w-md p-6 relative">
+                        {/* 关闭按钮 */}
+                        {!isExporting && (
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-stone-700 text-stone-400 hover:text-white transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        )}
+
+                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <Film className="w-6 h-6 text-orange-500" />
+                            导出 MP4 视频
+                        </h3>
+
+                        {!isExporting ? (
+                            <>
+                                {/* 设置选项 */}
+                                <div className="space-y-4">
+                                    {/* 分辨率 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                                            分辨率
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {RESOLUTION_OPTIONS.map((opt) => (
+                                                <button
+                                                    key={opt.label}
+                                                    onClick={() => setSelectedResolution(opt)}
+                                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedResolution === opt
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                        }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 帧率 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                                            帧率
+                                        </label>
+                                        <div className="flex gap-2">
+                                            {FPS_OPTIONS.map((opt) => (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => setSelectedFps(opt)}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedFps === opt
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                        }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 时长 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                                            视频时长
+                                        </label>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {DURATION_OPTIONS.map((opt) => (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => setSelectedDuration(opt)}
+                                                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all ${selectedDuration === opt
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                        }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 质量 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                                            视频质量
+                                        </label>
+                                        <div className="flex gap-2">
+                                            {(["high", "medium", "low"] as const).map((q) => (
+                                                <button
+                                                    key={q}
+                                                    onClick={() => setSelectedQuality(q)}
+                                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedQuality === q
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                        }`}
+                                                >
+                                                    {q === "high" ? "高质量" : q === "medium" ? "中等" : "低质量"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 预估信息 */}
+                                <div className="mt-4 p-3 rounded-lg bg-stone-800/50 text-sm text-stone-400">
+                                    <div className="flex justify-between">
+                                        <span>预估帧数</span>
+                                        <span className="text-white">{selectedFps.value * selectedDuration.value} 帧</span>
+                                    </div>
+                                    <div className="flex justify-between mt-1">
+                                        <span>输出尺寸</span>
+                                        <span className="text-white">{selectedResolution.width}×{selectedResolution.height}</span>
+                                    </div>
+                                </div>
+
+                                {/* 错误信息 */}
+                                {exportError && (
+                                    <div className="mt-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-sm">
+                                        {exportError}
+                                    </div>
+                                )}
+
+                                {/* 开始导出按钮 */}
+                                <button
+                                    onClick={handleExportMP4}
+                                    className="w-full mt-6 btn-primary flex items-center justify-center gap-2"
+                                >
+                                    <Film className="w-4 h-4" />
+                                    开始导出
+                                </button>
+                            </>
+                        ) : (
+                            /* 导出进度 */
+                            <div className="py-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    {exportProgress < 100 ? (
+                                        <RefreshCw className="w-6 h-6 text-orange-500 animate-spin" />
+                                    ) : (
+                                        <Check className="w-6 h-6 text-green-500" />
+                                    )}
+                                    <span className="text-white font-medium">{exportMessage}</span>
+                                </div>
+
+                                {/* 进度条 */}
+                                <div className="w-full h-3 bg-stone-700 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-orange-500 to-pink-500 transition-all duration-300"
+                                        style={{ width: `${exportProgress}%` }}
+                                    />
+                                </div>
+                                <div className="text-right text-sm text-stone-400 mt-2">
+                                    {Math.round(exportProgress)}%
+                                </div>
+
+                                <p className="text-xs text-stone-500 mt-4 text-center">
+                                    首次加载 FFmpeg 可能需要较长时间，请耐心等待...
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
