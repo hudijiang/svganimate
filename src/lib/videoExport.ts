@@ -1,5 +1,17 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
+/**
+ * 视频导出工具库 V6 (DOM 快照合成方案)
+ * 
+ * 核心逻辑：
+ * 1. 挂载：将 SVG 挂载到不可见 DOM 中。
+ * 2. 步进：使用 svg.setCurrentTime(t) 精确控制动画时间。
+ * 3. 快照：在每个时间点，深度克隆 SVG 树。
+ *    - 烘焙 Computed Styles (transform, opacity, fill, stroke...)
+ *    - 烘焙 SVG animVal (cx, cy, r, x, y...)
+ *    - 移除动画标签 (使快照静态化)
+ * 4. 渲染：序列化快照 -> Image -> Canvas -> FFmpeg。
+ * 
+ * 优点：所见即所得，理论上支持浏览器能渲染的任何 SVG 动画 (CSS/SMIL)。
+ */
 
 type ProgressCallback = (progress: number, message: string) => void;
 
@@ -11,145 +23,247 @@ interface ExportOptions {
     quality?: 'high' | 'medium' | 'low';
 }
 
-// 默认 4K 分辨率
 const DEFAULT_OPTIONS: Required<ExportOptions> = {
-    width: 3840,
-    height: 2160,
+    width: 1920,
+    height: 1080,
     fps: 30,
-    duration: 5, // 秒
+    duration: 5,
     quality: 'high',
 };
 
-// 质量预设
-const QUALITY_PRESETS = {
-    high: { crf: 18, preset: 'slow' },
-    medium: { crf: 23, preset: 'medium' },
-    low: { crf: 28, preset: 'fast' },
-};
+// ==========================================
+// FFmpeg (保持不变)
+// ==========================================
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let ffmpegInstance: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let ffmpegLoadingPromise: Promise<any> | null = null;
 
-let ffmpeg: FFmpeg | null = null;
-let loaded = false;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadFFmpeg(onProgress?: ProgressCallback): Promise<any> {
+    if (ffmpegInstance) return ffmpegInstance;
+    if (ffmpegLoadingPromise) return ffmpegLoadingPromise;
 
-/**
- * 加载 FFmpeg
- */
-export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<FFmpeg> {
-    if (ffmpeg && loaded) {
-        return ffmpeg;
-    }
+    ffmpegLoadingPromise = (async () => {
+        try {
+            onProgress?.(10, '加载动效引擎...');
+            const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+            const { toBlobURL } = await import('@ffmpeg/util');
 
-    ffmpeg = new FFmpeg();
+            const ffmpeg = new FFmpeg();
+            // Silence logs usually
+            // ffmpeg.on('log', ({ message }) => console.log(message));
 
-    ffmpeg.on('log', ({ message }) => {
-        console.log('[FFmpeg]', message);
-    });
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+            const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
 
-    ffmpeg.on('progress', ({ progress }) => {
-        onProgress?.(progress * 100, '编码中...');
-    });
-
-    onProgress?.(0, '加载 FFmpeg...');
-
-    // 加载 FFmpeg 核心
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-    await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-
-    loaded = true;
-    onProgress?.(5, 'FFmpeg 已加载');
-
-    return ffmpeg;
+            await ffmpeg.load({ coreURL, wasmURL });
+            ffmpegInstance = ffmpeg;
+            return ffmpeg;
+        } catch (error) {
+            console.error('FFmpeg load failed', error);
+            ffmpegLoadingPromise = null;
+            throw error;
+        }
+    })();
+    return ffmpegLoadingPromise;
 }
 
-/**
- * 将 SVG 字符串渲染到 Canvas 并返回 PNG 数据
- */
-async function svgToCanvas(
-    svgString: string,
-    width: number,
-    height: number
-): Promise<HTMLCanvasElement> {
-    return new Promise((resolve, reject) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
+// ==========================================
+// DOM 快照核心 (V6 Secret Sauce)
+// ==========================================
 
-        if (!ctx) {
-            reject(new Error('无法创建 Canvas 上下文'));
-            return;
+// 需要烘焙的 CSS 属性
+const COMPUTED_STYLES_TO_BAKE = [
+    'transform', 'transform-origin',
+    'opacity', 'visibility', 'display',
+    'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-dashoffset',
+    'font-size', 'font-family', 'font-weight', 'text-anchor'
+];
+
+// 需要烘焙的 SVG 属性 (检查 animVal)
+const SVG_ANIM_ATTRS = [
+    'x', 'y', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height', 'd', 'fill', 'stroke', 'transform' // transform 既可以是 attr 也可以是 style
+];
+
+/**
+ * 深度克隆节点，并“烘焙”当前的动画状态到静态属性/样式中
+ */
+function snapshotNode(node: Node): Node {
+    // 浅拷贝当前节点
+    const clone = node.cloneNode(false);
+
+    // 如果是元素节点，进行烘焙
+    if (node instanceof Element && clone instanceof Element) {
+        // 1. 烘焙 Computed Styles
+        // 这一步捕获 CSS 动画和 animateTransform 的结果 (在 Chrome 中)
+        const computed = window.getComputedStyle(node);
+
+        // 优化：只有当节点可见时才处理复杂样式
+        if (computed.display !== 'none') {
+            // 我们只复制关键样式，复制所有 style 会导致体积爆炸且可能有副作用
+            COMPUTED_STYLES_TO_BAKE.forEach(prop => {
+                const val = computed.getPropertyValue(prop);
+                // 只有当值不是默认值时才设置 (简单的优化)
+                if (val && val !== 'none' && val !== 'auto' && val !== '0px') {
+                    // 特殊处理 transform
+                    // getComputedStyle 返回的是矩阵 matrix(...)
+                    // 我们直接将其写入 style 属性
+                    (clone as HTMLElement).style.setProperty(prop, val);
+                }
+            });
         }
 
-        // 创建 SVG Blob
-        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(svgBlob);
+        // 2. 烘焙 SVG animVal
+        // 这一步捕获 SMIL <animate> 修改的属性 (如 cx, r)
+        // 注意：Web 动画 API 或 CSS 动画通常反映在 computedStyles 中，但 SMIL 有时直接修改 animVal
 
-        const img = new Image();
-        img.onload = () => {
-            // 清除画布并绘制
-            ctx.fillStyle = '#0d1117';
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
-            URL.revokeObjectURL(url);
-            resolve(canvas);
-        };
-        img.onerror = () => {
-            URL.revokeObjectURL(url);
-            reject(new Error('SVG 加载失败'));
-        };
-        img.src = url;
-    });
-}
+        // TypeScript don't know indiscriminately about SVGElement properties
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const svgNode = node as any;
 
-/**
- * 从 Canvas 获取 PNG 数据
- */
-function canvasToPng(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-        canvas.toBlob(
-            async (blob) => {
-                if (!blob) {
-                    reject(new Error('无法生成 PNG'));
-                    return;
+        SVG_ANIM_ATTRS.forEach(attr => {
+            if (svgNode[attr] && 'animVal' in svgNode[attr]) {
+                try {
+                    let val = svgNode[attr].animVal;
+                    // SVGLength or SVGAnimatedLength
+                    if (val && typeof val === 'object' && 'value' in val) {
+                        val = val.value;
+                    }
+                    // 写入克隆节点的属性 (baseVal)
+                    if (val !== undefined && val !== null) {
+                        clone.setAttribute(attr, String(val));
+                    }
+                } catch (e) {
+                    // Ignore access errors
                 }
-                const arrayBuffer = await blob.arrayBuffer();
-                resolve(new Uint8Array(arrayBuffer));
-            },
-            'image/png',
-            1.0
-        );
-    });
+            }
+        });
+
+        // 3. 移除动画标签，防止它们在静态 SVG 中再次运行
+        if (['animate', 'animateMotion', 'animateTransform', 'set'].includes(clone.tagName)) {
+            // 返回空文本节点代替，或者允许它存在但不生效
+            // 最好是移除，但我们在递归中不好移除 self。
+            // 实际上我们可以在最后序列化时过滤，或者在这里做标记。
+            // 简单策略：不处理 children 就行？不，它本身存在可能就有副作用。
+            // 标记 remove
+            clone.setAttribute('data-remove', 'true');
+        }
+    }
+
+    // 递归处理子节点
+    let child = node.firstChild;
+    while (child) {
+        const clonedChild = snapshotNode(child);
+        const el = clonedChild as Element;
+        // 如果不是标记为删除的动画节点
+        if (!el || el.getAttribute !== undefined && !el.getAttribute('data-remove')) {
+            clone.appendChild(clonedChild);
+        }
+        child = child.nextSibling;
+    }
+
+    return clone;
 }
 
-/**
- * 捕获 SVG 动画帧
- */
+// ==========================================
+// 帧捕捉逻辑
+// ==========================================
 async function captureFrames(
     svgString: string,
     options: Required<ExportOptions>,
     onProgress?: ProgressCallback
-): Promise<Uint8Array[]> {
+): Promise<Uint8Array[]> { // 返回 JPEG/PNG buffer 数组
     const { width, height, fps, duration } = options;
-    const totalFrames = fps * duration;
+    const totalFrames = Math.ceil(duration * fps);
     const frames: Uint8Array[] = [];
 
-    onProgress?.(5, `准备捕获 ${totalFrames} 帧...`);
-
-    // 创建一个隐藏的容器来渲染 SVG 动画
+    // 1. 创建容器和 live SVG
     const container = document.createElement('div');
-    container.style.cssText = 'position: fixed; top: -9999px; left: -9999px; width: 100px; height: 100px;';
+    container.style.cssText = `position:absolute;top:-9999px;left:-9999px;width:${width}px;height:${height}px;visibility:hidden;overflow:hidden;`;
+    container.innerHTML = svgString;
     document.body.appendChild(container);
+
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) throw new Error('Invalid SVG');
+
+    // 强制尺寸
+    svgEl.setAttribute('width', width.toString());
+    svgEl.setAttribute('height', height.toString());
+    svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    // 等待 DOM 准备就绪
+    // await new Promise(r => setTimeout(r, 100));
+
+    // 2. 准备 Canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    // 3. 暂停动画 (必须在此操作)
+    if (svgEl.pauseAnimations) {
+        svgEl.pauseAnimations();
+        svgEl.setCurrentTime(0);
+    }
 
     try {
         for (let i = 0; i < totalFrames; i++) {
-            const canvas = await svgToCanvas(svgString, width, height);
-            const pngData = await canvasToPng(canvas);
-            frames.push(pngData);
+            const t = i / fps;
 
-            const progress = 5 + ((i + 1) / totalFrames) * 35;
-            onProgress?.(progress, `捕获帧 ${i + 1}/${totalFrames}`);
+            // A. 设置时间
+            if (svgEl.setCurrentTime) {
+                svgEl.setCurrentTime(t);
+            }
+
+            // B. 快照 (The Bake)
+            const clonedSvgNode = snapshotNode(svgEl) as Element;
+
+            // 确保克隆体有命名空间
+            clonedSvgNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+            // 序列化
+            const frameSvgString = new XMLSerializer().serializeToString(clonedSvgNode);
+
+            // C. 渲染到 Canvas
+            const img = new Image();
+            const blob = new Blob([frameSvgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            await new Promise<void>((resolve, reject) => {
+                img.onload = () => {
+                    ctx?.clearRect(0, 0, width, height);
+                    // 绘制背景 (可选，防止透明背景导致视频花屏)
+                    ctx!.fillStyle = '#000000';
+                    // ctx!.fillRect(0, 0, width, height); // 用户背景可能是黑的？保持透明
+
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = url;
+            });
+
+            URL.revokeObjectURL(url);
+
+            // D. 获取数据
+            // 使用 JPEG 质量低一点换速度？不，MP4 需要清晰度。
+            // 使用 getImageData 太大。使用 canvas.toBlob? 
+            // 实际上为了传给 ffmpeg，我们需要 Uint8Array。
+            // 我们可以直接用 canvas.toBlob('image/jpeg', 0.9)
+
+            const frameBlob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+            if (frameBlob) {
+                frames.push(new Uint8Array(await frameBlob.arrayBuffer()));
+            }
+
+            // 进度
+            const p = i / totalFrames;
+            onProgress?.(10 + Math.round(p * 50), `渲染帧 ${i + 1}/${totalFrames}`);
+
+            // 让出主线程，防止 UI 卡死
+            if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
         }
     } finally {
         document.body.removeChild(container);
@@ -158,88 +272,122 @@ async function captureFrames(
     return frames;
 }
 
-/**
- * 将 SVG 动画导出为 4K MP4 视频
- */
-export async function exportToMP4(
+// ==========================================
+// 主过程
+// ==========================================
+
+export async function exportToMP4Client(
+    svgString: string,
+    options: ExportOptions = {},
+    onProgress?: ProgressCallback
+): Promise<Blob> {
+    const opts = { ...DEFAULT_OPTIONS, ...options };
+
+    try {
+        // 1. 加载 FFmpeg
+        const ff = await loadFFmpeg(onProgress);
+
+        // 2. 逐帧渲染
+        onProgress?.(0, '开始逐帧渲染 (高精度模式)...');
+        const frames = await captureFrames(svgString, opts, onProgress);
+
+        // 3. 写入 FFmpeg FS
+        onProgress?.(60, '写入帧数据...');
+        for (let i = 0; i < frames.length; i++) {
+            const fname = `frame_${String(i).padStart(3, '0')}.jpg`;
+            await ff.writeFile(fname, frames[i]);
+        }
+
+        // 4. 合成
+        onProgress?.(80, '合成 MP4...');
+        await ff.exec([
+            '-framerate', String(opts.fps),
+            '-i', 'frame_%03d.jpg',
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            // '-preset', 'ultrafast', // 质量优先可以稍慢一点
+            '-y',
+            'output.mp4'
+        ]);
+
+        // 5. 读取
+        const data = await ff.readFile('output.mp4');
+        const blob = new Blob([data], { type: 'video/mp4' });
+
+        // 清理
+        onProgress?.(95, '清理临时文件...');
+        for (let i = 0; i < frames.length; i++) {
+            await ff.deleteFile(`frame_${String(i).padStart(3, '0')}.jpg`);
+        }
+        await ff.deleteFile('output.mp4');
+
+        onProgress?.(100, '完成！');
+        return blob;
+
+    } catch (err) {
+        console.error('Snapshot export failed', err);
+        throw err;
+    }
+}
+
+// ==========================================
+// 辅助与兼容 (保持不变)
+// ==========================================
+export async function exportToMP4Server(
     svgString: string,
     options: ExportOptions = {},
     onProgress?: ProgressCallback
 ): Promise<Blob> {
     const opts: Required<ExportOptions> = { ...DEFAULT_OPTIONS, ...options };
-    const { width, height, fps, quality } = opts;
-    const qualitySettings = QUALITY_PRESETS[quality];
 
-    onProgress?.(0, '初始化...');
+    onProgress?.(0, '发送到服务器...');
 
-    // 加载 FFmpeg
-    const ff = await loadFFmpeg(onProgress);
+    const response = await fetch('/api/export-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            svgContent: svgString,
+            duration: opts.duration,
+            fps: opts.fps,
+            width: opts.width,
+            height: opts.height,
+        }),
+    });
 
-    // 捕获帧
-    const frames = await captureFrames(svgString, opts, onProgress);
-
-    onProgress?.(40, '写入帧数据...');
-
-    // 将帧写入 FFmpeg 虚拟文件系统
-    for (let i = 0; i < frames.length; i++) {
-        const fileName = `frame_${String(i).padStart(5, '0')}.png`;
-        await ff.writeFile(fileName, frames[i]);
-
-        const progress = 40 + ((i + 1) / frames.length) * 20;
-        onProgress?.(progress, `写入帧 ${i + 1}/${frames.length}`);
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '服务器错误');
     }
 
-    onProgress?.(60, '开始编码 MP4...');
-
-    // 运行 FFmpeg 命令: 将 PNG 序列编码为 MP4
-    await ff.exec([
-        '-framerate', String(fps),
-        '-i', 'frame_%05d.png',
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-crf', String(qualitySettings.crf),
-        '-preset', qualitySettings.preset,
-        '-s', `${width}x${height}`,
-        '-y',
-        'output.mp4'
-    ]);
-
-    onProgress?.(95, '读取输出文件...');
-
-    // 读取输出文件
-    const data = await ff.readFile('output.mp4');
-
-    // 清理临时文件
-    for (let i = 0; i < frames.length; i++) {
-        const fileName = `frame_${String(i).padStart(5, '0')}.png`;
-        await ff.deleteFile(fileName);
-    }
-    await ff.deleteFile('output.mp4');
-
-    onProgress?.(100, '导出完成！');
-
-    // 转换为 Blob
-    // @ts-expect-error ffmpeg.wasm 返回的 Uint8Array 在运行时是有效的 BlobPart
-    return new Blob([data], { type: 'video/mp4' });
+    onProgress?.(80, '下载视频...');
+    const blob = await response.blob();
+    onProgress?.(100, '完成！');
+    return blob;
 }
 
-/**
- * 下载 Blob 为文件
- */
+export async function exportToMP4(
+    svgString: string,
+    options: ExportOptions = {},
+    onProgress?: ProgressCallback,
+    mode: 'server' | 'client' = 'server'
+): Promise<Blob> {
+    if (mode === 'client') {
+        return exportToMP4Client(svgString, options, onProgress);
+    }
+    return exportToMP4Server(svgString, options, onProgress);
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = filename.replace(/\.(mp4|webm)$/, '') + '.mp4';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
-/**
- * 获取可用的分辨率选项
- */
 export const RESOLUTION_OPTIONS = [
     { label: '4K (3840×2160)', width: 3840, height: 2160 },
     { label: '2K (2560×1440)', width: 2560, height: 1440 },
@@ -247,18 +395,12 @@ export const RESOLUTION_OPTIONS = [
     { label: '720p (1280×720)', width: 1280, height: 720 },
 ];
 
-/**
- * 获取可用的帧率选项
- */
 export const FPS_OPTIONS = [
     { label: '60 FPS', value: 60 },
     { label: '30 FPS', value: 30 },
     { label: '24 FPS', value: 24 },
 ];
 
-/**
- * 获取可用的时长选项
- */
 export const DURATION_OPTIONS = [
     { label: '3 秒', value: 3 },
     { label: '5 秒', value: 5 },

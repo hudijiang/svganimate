@@ -42,10 +42,11 @@ function CreateContent() {
     const [exportError, setExportError] = useState<string | null>(null);
 
     // 导出设置
-    const [selectedResolution, setSelectedResolution] = useState(RESOLUTION_OPTIONS[0]);
+    const [selectedResolution, setSelectedResolution] = useState(RESOLUTION_OPTIONS[2]); // 1080p 默认
     const [selectedFps, setSelectedFps] = useState(FPS_OPTIONS[1]); // 30 FPS
     const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[1]); // 5 秒
     const [selectedQuality, setSelectedQuality] = useState<"high" | "medium" | "low">("high");
+    const [exportMode, setExportMode] = useState<"server" | "client">("server");
 
     // 示例生成的 SVG
     const [generatedSvg, setGeneratedSvg] = useState(`
@@ -138,7 +139,8 @@ function CreateContent() {
                 (progress, message) => {
                     setExportProgress(progress);
                     setExportMessage(message);
-                }
+                },
+                exportMode
             );
 
             // 下载文件
@@ -443,6 +445,38 @@ function CreateContent() {
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+
+                                    {/* 渲染模式 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-stone-300 mb-2">
+                                            渲染模式
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setExportMode("server")}
+                                                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportMode === "server"
+                                                    ? "bg-orange-500 text-white"
+                                                    : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                    }`}
+                                            >
+                                                服务端渲染
+                                            </button>
+                                            <button
+                                                onClick={() => setExportMode("client")}
+                                                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${exportMode === "client"
+                                                    ? "bg-orange-500 text-white"
+                                                    : "bg-stone-700 text-stone-300 hover:bg-stone-600"
+                                                    }`}
+                                            >
+                                                客户端渲染
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-stone-500 mt-1">
+                                            {exportMode === "server"
+                                                ? "使用服务器渲染，速度更快，效果更好"
+                                                : "使用浏览器渲染，不消耗服务器资源"}
+                                        </p>
                                     </div>
                                 </div>
 
