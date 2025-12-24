@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     Sparkles,
@@ -28,6 +28,7 @@ import {
 function CreateContent() {
     const searchParams = useSearchParams();
     const initialPrompt = searchParams.get("prompt") || "";
+    const initialSvg = searchParams.get("svg");
 
     const [prompt, setPrompt] = useState(initialPrompt);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -48,54 +49,28 @@ function CreateContent() {
     const [selectedQuality, setSelectedQuality] = useState<"high" | "medium" | "low">("high");
     const [exportMode, setExportMode] = useState<"server" | "client">("server");
 
-    // 示例生成的 SVG
-    const [generatedSvg, setGeneratedSvg] = useState(`
-<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-  <!-- 背景 -->
-  <rect width="400" height="400" fill="#0d1117"/>
-  
-  <!-- 太阳 -->
-  <circle cx="200" cy="200" r="40" fill="#FDB813">
-    <animate attributeName="r" values="38;42;38" dur="2s" repeatCount="indefinite"/>
+    // 默认 SVG（用于后备，实际会从文件加载）
+    const fallbackSvg = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#0d1117"/>
+  <circle cx="100" cy="100" r="40" fill="#FDB813">
+    <animate attributeName="r" values="35;45;35" dur="2s" repeatCount="indefinite"/>
   </circle>
-  
-  <!-- 水星轨道 -->
-  <circle cx="200" cy="200" r="70" fill="none" stroke="#2d3748" stroke-width="1"/>
-  <circle r="6" fill="#A0AEC0">
-    <animateMotion dur="2s" repeatCount="indefinite">
-      <mpath href="#mercury-orbit"/>
-    </animateMotion>
-  </circle>
-  <path id="mercury-orbit" d="M 130 200 A 70 70 0 1 1 130 200.001" fill="none"/>
-  
-  <!-- 金星轨道 -->
-  <circle cx="200" cy="200" r="100" fill="none" stroke="#2d3748" stroke-width="1"/>
-  <circle r="10" fill="#ECC94B">
-    <animateMotion dur="3s" repeatCount="indefinite">
-      <mpath href="#venus-orbit"/>
-    </animateMotion>
-  </circle>
-  <path id="venus-orbit" d="M 100 200 A 100 100 0 1 1 100 200.001" fill="none"/>
-  
-  <!-- 地球轨道 -->
-  <circle cx="200" cy="200" r="140" fill="none" stroke="#2d3748" stroke-width="1"/>
-  <circle r="12" fill="#3182CE">
-    <animateMotion dur="4s" repeatCount="indefinite">
-      <mpath href="#earth-orbit"/>
-    </animateMotion>
-  </circle>
-  <path id="earth-orbit" d="M 60 200 A 140 140 0 1 1 60 200.001" fill="none"/>
-  
-  <!-- 火星轨道 -->
-  <circle cx="200" cy="200" r="175" fill="none" stroke="#2d3748" stroke-width="1"/>
-  <circle r="8" fill="#E53E3E">
-    <animateMotion dur="5.5s" repeatCount="indefinite">
-      <mpath href="#mars-orbit"/>
-    </animateMotion>
-  </circle>
-  <path id="mars-orbit" d="M 25 200 A 175 175 0 1 1 25 200.001" fill="none"/>
-</svg>
-  `);
+</svg>`;
+
+    // 使用从 URL 传入的 SVG，如果没有则从文件加载
+    const [generatedSvg, setGeneratedSvg] = useState(
+        initialSvg ? decodeURIComponent(initialSvg) : fallbackSvg
+    );
+
+    // 动态加载默认 SVG（八大行星）
+    useEffect(() => {
+        if (!initialSvg) {
+            fetch('/animations/solar-system.svg')
+                .then(res => res.text())
+                .then(svg => setGeneratedSvg(svg))
+                .catch(err => console.error('Failed to load default SVG:', err));
+        }
+    }, [initialSvg]);
 
     const handleGenerate = async () => {
         if (!prompt.trim()) return;

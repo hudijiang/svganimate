@@ -26,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body className={`${inter.variable} antialiased grid-background min-h-screen`}>
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={`${inter.variable} antialiased grid-background min-h-screen`} suppressHydrationWarning>
         <Navbar />
         <main className="pt-20">
           {children}

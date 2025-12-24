@@ -1,0 +1,7 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#0d1117"/>
+  <path d="M100 160 C60 120 20 100 20 60 C20 20 60 20 100 60 C140 20 180 20 180 60 C180 100 140 120 100 160" fill="#E53E3E">
+    <animate attributeName="transform" type="scale" values="1;1.1;1" dur="0.8s" repeatCount="indefinite" additive="sum"/>
+    <animateTransform attributeName="transform" type="translate" values="0,0;0,-5;0,0" dur="0.8s" repeatCount="indefinite"/>
+  </path>
+</svg>
