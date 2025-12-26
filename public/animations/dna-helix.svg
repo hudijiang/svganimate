@@ -1,17 +1,78 @@
-<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="200" fill="#0d1117"/>
-  <g transform="translate(100,100)">
+<svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .backbone { stroke-width: 3; fill: none; }
+      .base-pair { stroke-width: 2; }
+      .label { font-family: Arial, sans-serif; font-size: 8px; fill: #a0aec0; }
+    </style>
+  </defs>
+  <rect width="200" height="300" fill="#0d1117"/>
+  
+  <!-- DNA 双螺旋主体 -->
+  <g transform="translate(100, 150)">
     <g>
-      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/>
-      <line x1="-30" y1="-60" x2="30" y2="-60" stroke="#E53E3E" stroke-width="3"/>
-      <line x1="-30" y1="-30" x2="30" y2="-30" stroke="#3182CE" stroke-width="3"/>
-      <line x1="-30" y1="0" x2="30" y2="0" stroke="#48BB78" stroke-width="3"/>
-      <line x1="-30" y1="30" x2="30" y2="30" stroke="#ED8936" stroke-width="3"/>
-      <line x1="-30" y1="60" x2="30" y2="60" stroke="#9F7AEA" stroke-width="3"/>
-      <circle cx="-30" cy="-60" r="6" fill="#E53E3E"/>
-      <circle cx="30" cy="-60" r="6" fill="#3182CE"/>
-      <circle cx="-30" cy="-30" r="6" fill="#3182CE"/>
-      <circle cx="30" cy="-30" r="6" fill="#48BB78"/>
+      <!-- 整体旋转动画 -->
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite"/>
+      
+      <!-- 左侧骨架 (磷酸-糖链) -->
+      <path class="backbone" stroke="#4299E1" d="
+        M -30,-120 
+        Q 30,-100 30,-80 
+        Q -30,-60 -30,-40 
+        Q 30,-20 30,0 
+        Q -30,20 -30,40 
+        Q 30,60 30,80 
+        Q -30,100 -30,120
+      "/>
+      
+      <!-- 右侧骨架 (磷酸-糖链) -->
+      <path class="backbone" stroke="#48BB78" d="
+        M 30,-120 
+        Q -30,-100 -30,-80 
+        Q 30,-60 30,-40 
+        Q -30,-20 -30,0 
+        Q 30,20 30,40 
+        Q -30,60 -30,80 
+        Q 30,100 30,120
+      "/>
+      
+      <!-- 碱基对 A-T (红-蓝) -->
+      <line class="base-pair" x1="-15" y1="-110" x2="15" y2="-110" stroke="#E53E3E"/>
+      <circle cx="-15" cy="-110" r="4" fill="#E53E3E"/>
+      <circle cx="15" cy="-110" r="4" fill="#3182CE"/>
+      
+      <!-- 碱基对 G-C (黄-紫) -->
+      <line class="base-pair" x1="15" y1="-70" x2="-15" y2="-70" stroke="#ECC94B"/>
+      <circle cx="15" cy="-70" r="4" fill="#ECC94B"/>
+      <circle cx="-15" cy="-70" r="4" fill="#9F7AEA"/>
+      
+      <!-- 碱基对 T-A -->
+      <line class="base-pair" x1="-15" y1="-30" x2="15" y2="-30" stroke="#3182CE"/>
+      <circle cx="-15" cy="-30" r="4" fill="#3182CE"/>
+      <circle cx="15" cy="-30" r="4" fill="#E53E3E"/>
+      
+      <!-- 碱基对 C-G -->
+      <line class="base-pair" x1="15" y1="10" x2="-15" y2="10" stroke="#9F7AEA"/>
+      <circle cx="15" cy="10" r="4" fill="#9F7AEA"/>
+      <circle cx="-15" cy="10" r="4" fill="#ECC94B"/>
+      
+      <!-- 碱基对 A-T -->
+      <line class="base-pair" x1="-15" y1="50" x2="15" y2="50" stroke="#E53E3E"/>
+      <circle cx="-15" cy="50" r="4" fill="#E53E3E"/>
+      <circle cx="15" cy="50" r="4" fill="#3182CE"/>
+      
+      <!-- 碱基对 G-C -->
+      <line class="base-pair" x1="15" y1="90" x2="-15" y2="90" stroke="#ECC94B"/>
+      <circle cx="15" cy="90" r="4" fill="#ECC94B"/>
+      <circle cx="-15" cy="90" r="4" fill="#9F7AEA"/>
     </g>
+  </g>
+  
+  <!-- 图例 -->
+  <g transform="translate(10, 270)">
+    <circle cx="5" cy="0" r="3" fill="#E53E3E"/><text x="12" y="3" class="label">A-腺嘌呤</text>
+    <circle cx="55" cy="0" r="3" fill="#3182CE"/><text x="62" y="3" class="label">T-胸腺嘧啶</text>
+    <circle cx="115" cy="0" r="3" fill="#ECC94B"/><text x="122" y="3" class="label">G-鸟嘌呤</text>
+    <circle cx="165" cy="0" r="3" fill="#9F7AEA"/><text x="172" y="3" class="label">C-胞嘧啶</text>
   </g>
 </svg>

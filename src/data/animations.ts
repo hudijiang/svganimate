@@ -29,7 +29,7 @@ export const animationsData: AnimationMeta[] = [
     {
         id: "2",
         title: "DNA双螺旋结构旋转动画",
-        description: "展示DNA分子的双螺旋结构，包括碱基对的连接和整体旋转效果。DNA由两条反向平行的多核苷酸链组成，通过氢键连接碱基对（A-T、G-C）。",
+        description: "展示DNA分子的双螺旋结构，两条反向平行的磷酸-糖骨架相互缠绕，通过氢键连接碱基对（A腺嘌呤-T胸腺嘧啶、G鸟嘌呤-C胞嘧啶）。动画展示了DNA的三维螺旋旋转效果。",
         svgFile: "/animations/dna-helix.svg",
         likes: 189,
         views: 982,
