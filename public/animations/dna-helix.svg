@@ -1,78 +1,154 @@
 <svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <style>
-      .backbone { stroke-width: 3; fill: none; }
-      .base-pair { stroke-width: 2; }
-      .label { font-family: Arial, sans-serif; font-size: 8px; fill: #a0aec0; }
-    </style>
-  </defs>
   <rect width="200" height="300" fill="#0d1117"/>
   
-  <!-- DNA 双螺旋主体 -->
-  <g transform="translate(100, 150)">
+  <!-- DNA 双螺旋 - 沿纵轴旋转效果 -->
+  <g transform="translate(100, 20)">
+    <!-- 第1层碱基对 -->
     <g>
-      <!-- 整体旋转动画 -->
-      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="8s" repeatCount="indefinite"/>
-      
-      <!-- 左侧骨架 (磷酸-糖链) -->
-      <path class="backbone" stroke="#4299E1" d="
-        M -30,-120 
-        Q 30,-100 30,-80 
-        Q -30,-60 -30,-40 
-        Q 30,-20 30,0 
-        Q -30,20 -30,40 
-        Q 30,60 30,80 
-        Q -30,100 -30,120
-      "/>
-      
-      <!-- 右侧骨架 (磷酸-糖链) -->
-      <path class="backbone" stroke="#48BB78" d="
-        M 30,-120 
-        Q -30,-100 -30,-80 
-        Q 30,-60 30,-40 
-        Q -30,-20 -30,0 
-        Q 30,20 30,40 
-        Q -30,60 -30,80 
-        Q 30,100 30,120
-      "/>
-      
-      <!-- 碱基对 A-T (红-蓝) -->
-      <line class="base-pair" x1="-15" y1="-110" x2="15" y2="-110" stroke="#E53E3E"/>
-      <circle cx="-15" cy="-110" r="4" fill="#E53E3E"/>
-      <circle cx="15" cy="-110" r="4" fill="#3182CE"/>
-      
-      <!-- 碱基对 G-C (黄-紫) -->
-      <line class="base-pair" x1="15" y1="-70" x2="-15" y2="-70" stroke="#ECC94B"/>
-      <circle cx="15" cy="-70" r="4" fill="#ECC94B"/>
-      <circle cx="-15" cy="-70" r="4" fill="#9F7AEA"/>
-      
-      <!-- 碱基对 T-A -->
-      <line class="base-pair" x1="-15" y1="-30" x2="15" y2="-30" stroke="#3182CE"/>
-      <circle cx="-15" cy="-30" r="4" fill="#3182CE"/>
-      <circle cx="15" cy="-30" r="4" fill="#E53E3E"/>
-      
-      <!-- 碱基对 C-G -->
-      <line class="base-pair" x1="15" y1="10" x2="-15" y2="10" stroke="#9F7AEA"/>
-      <circle cx="15" cy="10" r="4" fill="#9F7AEA"/>
-      <circle cx="-15" cy="10" r="4" fill="#ECC94B"/>
-      
-      <!-- 碱基对 A-T -->
-      <line class="base-pair" x1="-15" y1="50" x2="15" y2="50" stroke="#E53E3E"/>
-      <circle cx="-15" cy="50" r="4" fill="#E53E3E"/>
-      <circle cx="15" cy="50" r="4" fill="#3182CE"/>
-      
-      <!-- 碱基对 G-C -->
-      <line class="base-pair" x1="15" y1="90" x2="-15" y2="90" stroke="#ECC94B"/>
-      <circle cx="15" cy="90" r="4" fill="#ECC94B"/>
-      <circle cx="-15" cy="90" r="4" fill="#9F7AEA"/>
+      <line x1="-25" y1="0" x2="25" y2="0" stroke="#E53E3E" stroke-width="3">
+        <animate attributeName="x1" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#E53E3E">
+        <animate attributeName="cx" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#3182CE">
+        <animate attributeName="cx" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第2层碱基对 (相位偏移) -->
+    <g transform="translate(0, 30)">
+      <line x1="0" y1="0" x2="0" y2="0" stroke="#ECC94B" stroke-width="3">
+        <animate attributeName="x1" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#ECC94B">
+        <animate attributeName="cx" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#9F7AEA">
+        <animate attributeName="cx" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第3层碱基对 -->
+    <g transform="translate(0, 60)">
+      <line x1="25" y1="0" x2="-25" y2="0" stroke="#3182CE" stroke-width="3">
+        <animate attributeName="x1" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#3182CE">
+        <animate attributeName="cx" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#E53E3E">
+        <animate attributeName="cx" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第4层碱基对 -->
+    <g transform="translate(0, 90)">
+      <line x1="0" y1="0" x2="0" y2="0" stroke="#9F7AEA" stroke-width="3">
+        <animate attributeName="x1" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#9F7AEA">
+        <animate attributeName="cx" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#ECC94B">
+        <animate attributeName="cx" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第5层碱基对 -->
+    <g transform="translate(0, 120)">
+      <line x1="-25" y1="0" x2="25" y2="0" stroke="#E53E3E" stroke-width="3">
+        <animate attributeName="x1" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#E53E3E">
+        <animate attributeName="cx" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#3182CE">
+        <animate attributeName="cx" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第6层碱基对 -->
+    <g transform="translate(0, 150)">
+      <line x1="0" y1="0" x2="0" y2="0" stroke="#ECC94B" stroke-width="3">
+        <animate attributeName="x1" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#ECC94B">
+        <animate attributeName="cx" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#9F7AEA">
+        <animate attributeName="cx" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第7层碱基对 -->
+    <g transform="translate(0, 180)">
+      <line x1="25" y1="0" x2="-25" y2="0" stroke="#3182CE" stroke-width="3">
+        <animate attributeName="x1" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#3182CE">
+        <animate attributeName="cx" values="25;0;-25;0;25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#E53E3E">
+        <animate attributeName="cx" values="-25;0;25;0;-25" dur="3s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- 第8层碱基对 -->
+    <g transform="translate(0, 210)">
+      <line x1="0" y1="0" x2="0" y2="0" stroke="#9F7AEA" stroke-width="3">
+        <animate attributeName="x1" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="x2" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </line>
+      <circle r="5" fill="#9F7AEA">
+        <animate attributeName="cx" values="0;-25;0;25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle r="5" fill="#ECC94B">
+        <animate attributeName="cx" values="0;25;0;-25;0" dur="3s" repeatCount="indefinite"/>
+      </circle>
     </g>
   </g>
   
+  <!-- 左侧骨架连线 -->
+  <path d="M 75,25 Q 50,40 75,55 Q 100,70 75,85 Q 50,100 75,115 Q 100,130 75,145 Q 50,160 75,175 Q 100,190 75,205 Q 50,220 75,235" 
+        stroke="#4299E1" stroke-width="2" fill="none" opacity="0.6">
+    <animate attributeName="d" 
+      values="M 75,25 Q 50,40 75,55 Q 100,70 75,85 Q 50,100 75,115 Q 100,130 75,145 Q 50,160 75,175 Q 100,190 75,205 Q 50,220 75,235;
+              M 100,25 Q 125,40 100,55 Q 75,70 100,85 Q 125,100 100,115 Q 75,130 100,145 Q 125,160 100,175 Q 75,190 100,205 Q 125,220 100,235;
+              M 125,25 Q 150,40 125,55 Q 100,70 125,85 Q 150,100 125,115 Q 100,130 125,145 Q 150,160 125,175 Q 100,190 125,205 Q 150,220 125,235;
+              M 100,25 Q 75,40 100,55 Q 125,70 100,85 Q 75,100 100,115 Q 125,130 100,145 Q 75,160 100,175 Q 125,190 100,205 Q 75,220 100,235;
+              M 75,25 Q 50,40 75,55 Q 100,70 75,85 Q 50,100 75,115 Q 100,130 75,145 Q 50,160 75,175 Q 100,190 75,205 Q 50,220 75,235"
+      dur="3s" repeatCount="indefinite"/>
+  </path>
+  
+  <!-- 右侧骨架连线 -->
+  <path d="M 125,25 Q 150,40 125,55 Q 100,70 125,85 Q 150,100 125,115 Q 100,130 125,145 Q 150,160 125,175 Q 100,190 125,205 Q 150,220 125,235" 
+        stroke="#48BB78" stroke-width="2" fill="none" opacity="0.6">
+    <animate attributeName="d" 
+      values="M 125,25 Q 150,40 125,55 Q 100,70 125,85 Q 150,100 125,115 Q 100,130 125,145 Q 150,160 125,175 Q 100,190 125,205 Q 150,220 125,235;
+              M 100,25 Q 75,40 100,55 Q 125,70 100,85 Q 75,100 100,115 Q 125,130 100,145 Q 75,160 100,175 Q 125,190 100,205 Q 75,220 100,235;
+              M 75,25 Q 50,40 75,55 Q 100,70 75,85 Q 50,100 75,115 Q 100,130 75,145 Q 50,160 75,175 Q 100,190 75,205 Q 50,220 75,235;
+              M 100,25 Q 125,40 100,55 Q 75,70 100,85 Q 125,100 100,115 Q 75,130 100,145 Q 125,160 100,175 Q 75,190 100,205 Q 125,220 100,235;
+              M 125,25 Q 150,40 125,55 Q 100,70 125,85 Q 150,100 125,115 Q 100,130 125,145 Q 150,160 125,175 Q 100,190 125,205 Q 150,220 125,235"
+      dur="3s" repeatCount="indefinite"/>
+  </path>
+  
+  <!-- 标题 -->
+  <text x="100" y="270" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="10">DNA 双螺旋结构</text>
+  
   <!-- 图例 -->
-  <g transform="translate(10, 270)">
-    <circle cx="5" cy="0" r="3" fill="#E53E3E"/><text x="12" y="3" class="label">A-腺嘌呤</text>
-    <circle cx="55" cy="0" r="3" fill="#3182CE"/><text x="62" y="3" class="label">T-胸腺嘧啶</text>
-    <circle cx="115" cy="0" r="3" fill="#ECC94B"/><text x="122" y="3" class="label">G-鸟嘌呤</text>
-    <circle cx="165" cy="0" r="3" fill="#9F7AEA"/><text x="172" y="3" class="label">C-胞嘧啶</text>
+  <g transform="translate(30, 285)">
+    <circle cx="0" cy="0" r="4" fill="#E53E3E"/><text x="8" y="3" fill="#a0aec0" font-size="7">A</text>
+    <circle cx="30" cy="0" r="4" fill="#3182CE"/><text x="38" y="3" fill="#a0aec0" font-size="7">T</text>
+    <circle cx="60" cy="0" r="4" fill="#ECC94B"/><text x="68" y="3" fill="#a0aec0" font-size="7">G</text>
+    <circle cx="90" cy="0" r="4" fill="#9F7AEA"/><text x="98" y="3" fill="#a0aec0" font-size="7">C</text>
+    <text x="120" y="3" fill="#4299E1" font-size="7">—骨架</text>
   </g>
 </svg>
